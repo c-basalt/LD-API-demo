@@ -31,7 +31,7 @@ from utils.util import *
 
 class MainFrame(wx.Frame):
 
-    LD_VERSION = "v1.5.3"
+    LD_VERSION = "v1.5.3 mod"
 
     def __init__(self, parent=None):
         """B站直播同传/歌词弹幕发送工具"""
@@ -56,6 +56,7 @@ class MainFrame(wx.Frame):
         pub.subscribe(self.SpreadDanmu,"ws_recv")                   # 消息：监听到同传弹幕
         pub.subscribe(self.StartListening,"ws_start")               # 消息：开始监听房间内的弹幕
         pub.subscribe(self.SetSpreadButtonState,"ws_error")         # 消息：监听过程中出现错误/恢复
+        pub.subscribe(self.HandleApi, 'api_control')
         # API
         self.blApi = BiliLiveAPI(self.cookies,(self.timeout_s,5))   # B站账号与直播相关接口
         self.wyApi = NetEaseMusicAPI()                              # 网易云音乐接口
@@ -101,6 +102,7 @@ class MainFrame(wx.Frame):
         # 其他参数
         self.tmp_clipboard=""                                       # 临时剪贴板内容
         self.recent_danmu = {"_%d_"%i:0 for i in range(5)}          # 近期发送的弹幕字典（{弹幕内容：内容重复次数}）
+        self.last_set_comment = None
         self.danmu_queue = []                                       # 待发送弹幕队列
         self.recent_history = []                                    # 评论框历史记录列表
         self.tmp_history = []                                       # 评论框历史记录列表（临时）
@@ -1243,6 +1245,13 @@ class MainFrame(wx.Frame):
                     wx.MilliSleep(self.send_interval_ms)
                     self.SendDanmu(roomid,pre+remain_msg,src,pre,max_len)
             return succ_send
+
+    def HandleApi(self, command, payload):
+        if command == 'set_comment':
+            if payload['text'] != self.last_set_comment:
+                self.last_set_comment = payload['text']
+                text = re.sub(r'\s+', ' ', payload['text'])
+                self.tcComment.SetValue(text)
 
     def SpreadDanmu(self,roomid,speaker,content):
         """转发同传弹幕"""
